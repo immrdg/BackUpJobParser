@@ -85,37 +85,78 @@ export function FileUpload({ onDataParsed }: FileUploadProps) {
     return parsedData;
   }, []);
 
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const processFiles = useCallback(async (files: FileList) => {
+    const allData: TableData[] = [];
+    const filePromises = Array.from(files).map(file => {
+      return new Promise<TableData[]>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          const parsedData = parseFileContent(content, file.name);
+          resolve(parsedData);
+        };
+        reader.readAsText(file);
+      });
+    });
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const parsedData = parseFileContent(content, file.name);
-      onDataParsed(parsedData);
-    };
-    reader.readAsText(file);
+    try {
+      const results = await Promise.all(filePromises);
+      results.forEach(data => {
+        allData.push(...data);
+      });
+      onDataParsed(allData);
+    } catch (error) {
+      console.error('Error processing files:', error);
+    }
   }, [onDataParsed, parseFileContent]);
+
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    processFiles(files);
+  }, [processFiles]);
+
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.currentTarget.classList.add('bg-gray-100');
+  }, []);
+
+  const handleDragLeave = useCallback((event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.currentTarget.classList.remove('bg-gray-100');
+  }, []);
+
+  const handleDrop = useCallback((event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.currentTarget.classList.remove('bg-gray-100');
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      processFiles(files);
+    }
+  }, [processFiles]);
 
   return (
       <div className="w-full max-w-md mx-auto">
         <label
             htmlFor="file-upload"
             className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
         >
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             <Upload className="w-10 h-10 mb-3 text-gray-400" />
             <p className="mb-2 text-sm text-gray-500">
               <span className="font-semibold">Click to upload</span> or drag and drop
             </p>
-            <p className="text-xs text-gray-500">CSV or TSV files (with numeric batch ID in filename)</p>
+            <p className="text-xs text-gray-500">Multiple CSV or TSV files supported</p>
           </div>
           <input
               id="file-upload"
               type="file"
               className="hidden"
               accept=".csv,.tsv,.txt"
+              multiple
               onChange={handleFileUpload}
           />
         </label>

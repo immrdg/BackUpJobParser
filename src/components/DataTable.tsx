@@ -21,9 +21,14 @@ export function DataTable({ data }: DataTableProps) {
       ].join(','))
     ].join('\n');
 
-    const batchId = data[0]?.batchId || 'unknown';
+    // Get unique batch IDs
+    const uniqueBatchIds = Array.from(new Set(data.map(row => row.batchId))).sort();
+    const batchIdString = uniqueBatchIds.length > 3
+        ? `batches-${uniqueBatchIds.length}`
+        : `batch-${uniqueBatchIds.join('-')}`;
+
     const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `batch-${batchId}-${timestamp}.csv`;
+    const filename = `${batchIdString}-${timestamp}.csv`;
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
